@@ -1,0 +1,20 @@
+设备-总线-驱动模型 dev-bus_type-dri
+
+注册设备/或者驱动在总线结构体(ie, iic_bus, spi_bus, uart_bus)的两个链表下 dri_list/dev_list (实际不叫这个)
+然后查找有无匹配项，有的话会触发drv.probe函数进行绑定
+
+对于drv_by_template来说，是将设备与驱动进行分离，更加灵活
+drv_by_template对设备进行初始化直接写死了，而驱动设备分离就可以灵活更改
+    注册设备和驱动:
+        --platform_driver_register
+        --platform_device_register
+
+--ref/06*/source/led_dev2.c
+在device中修改 driver_override = “dri_name” 实现了驱动一对多
+platform_device_id 中 id_table实现match，drv在id_talbe里注册能支持设备
+
+先加drv:1.加入drv链表；2.遍历dev链表进行匹配，若匹配调用probe函数
+先加dev:1.加入dev链表；2.遍历dev链表进行匹配，若匹配调用drv的probe函数
+        --device_attach_driver // 链表遍历，从设备配对驱动
+        --drive_match_device // 匹配函数
+        --drive_probe

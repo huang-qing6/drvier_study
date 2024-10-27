@@ -1,2 +1,2 @@
-# drvier_study
-驱动开发学习
+# drv-study
+嵌入式驱动学习
