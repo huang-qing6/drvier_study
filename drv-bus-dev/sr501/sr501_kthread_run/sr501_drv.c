@@ -75,25 +75,8 @@ static struct file_operations sr501_fops = {
 	.poll    = sr501_drv_poll,
 };
 
-
-static irqreturn_t sr501_isr(int irq, void *dev_id)
-{
-	int val = gpiod_get_value(sr501_gpio);
-	/* 1. 记录数据 */
-	sr501_data = 0x80 | val;
-	printk("%s %s %d, val = 0x%x\n", __FILE__, __FUNCTION__, __LINE__, sr501_data);
-
-	/* 2. 唤醒APP:去同一个链表把APP唤醒 */
-	wake_up(&sr501_wq);
-	
-	return IRQ_HANDLED; // IRQ_WAKE_THREAD;
-}
-
-
-
 /* 1. 从platform_device获得GPIO
- * 2. gpio=>irq
- * 3. request_irq
+ * 2. 中断换init中内核线程模拟
  */
 static int sr501_probe(struct platform_device *pdev)
 {
@@ -101,9 +84,6 @@ static int sr501_probe(struct platform_device *pdev)
 	/* 1. 获得硬件信息 */
 	sr501_gpio = gpiod_get(&pdev->dev, NULL, 0);
 	gpiod_direction_input(sr501_gpio);
-
-	irq = gpiod_to_irq(sr501_gpio);
-	request_irq(irq, sr501_isr, IRQF_TRIGGER_RISING|IRQF_TRIGGER_FALLING, "sr501", NULL);
 
 	/* 2. device_create */
 	device_create(sr501_class, NULL, MKDEV(major, 0), NULL, "sr501");
@@ -115,7 +95,6 @@ static int sr501_remove(struct platform_device *pdev)
 {
 	printk("%s %s line %d\n", __FILE__, __FUNCTION__, __LINE__);
 	device_destroy(sr501_class, MKDEV(major, 0));
-	free_irq(irq, NULL);
 	gpiod_put(sr501_gpio);
 	return 0;
 }
@@ -136,14 +115,30 @@ static struct platform_driver sr501s_driver = {
     },
 };
 
-static int sr501_thread_func(void *data)
+static int sr501_thread(void *data)
 {
-	int cnt = 0;
-	while (!kthread_should_stop()) 
+	int val;
+	int pre = -1;
+	while (1)
 	{
-		printk("%s %s line %d, cnt = %d\n", __FILE__, __FUNCTION__, __LINE__, cnt++);
+		val = gpiod_get_value(sr501_gpio);
+
+		if (pre != val)
+		{
+			printk("%s %s %d, val = 0x%x\n", __FILE__, __FUNCTION__, __LINE__, val); 	
+			sr501_data = val;
+			wake_up(&sr501_wq);
+			pre = val;
+		}
+		
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(5*HZ);
+		schedule_timeout(HZ);
+
+		if (kthread_should_stop()) {
+			set_current_state(TASK_RUNNING);
+			break;
+		}
+		
 	}
 	return 0;
 }
@@ -155,8 +150,9 @@ static int __init sr501_init(void)
     
 	printk("%s %s line %d\n", __FILE__, __FUNCTION__, __LINE__);
 
-	sr501_kthread = kthread_run(sr501_thread_func, NULL, "sr501d");
-	return 0;
+	// 注册内核线程
+	sr501_kthread = kthread_run(sr501_thread, NULL, "sr501d");
+	//return 0;
 	
 	/* 注册file_operations 	*/
 	major = register_chrdev(0, "sr501", &sr501_fops);  
@@ -184,7 +180,7 @@ static void __exit sr501_exit(void)
 	printk("%s %s line %d\n", __FILE__, __FUNCTION__, __LINE__);
 
 	kthread_stop(sr501_kthread);
-	return ;
+	//return ;
 
     platform_driver_unregister(&sr501s_driver);
 	class_destroy(sr501_class);

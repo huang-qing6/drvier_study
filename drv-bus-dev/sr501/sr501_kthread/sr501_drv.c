@@ -66,28 +66,12 @@ static unsigned int sr501_drv_poll(struct file *fp, poll_table * wait)
 	return 0;
 }
 
-
-
 /* 定义自己的file_operations结构体                                              */
 static struct file_operations sr501_fops = {
 	.owner	 = THIS_MODULE,
 	.read    = sr501_drv_read,
 	.poll    = sr501_drv_poll,
 };
-
-
-static irqreturn_t sr501_isr(int irq, void *dev_id)
-{
-	int val = gpiod_get_value(sr501_gpio);
-	/* 1. 记录数据 */
-	sr501_data = 0x80 | val;
-	printk("%s %s %d, val = 0x%x\n", __FILE__, __FUNCTION__, __LINE__, sr501_data);
-
-	/* 2. 唤醒APP:去同一个链表把APP唤醒 */
-	wake_up(&sr501_wq);
-	
-	return IRQ_HANDLED; // IRQ_WAKE_THREAD;
-}
 
 static int sr501_thread(void *data)
 {
@@ -132,7 +116,7 @@ static int sr501_probe(struct platform_device *pdev)
 #if 0
 	irq = gpiod_to_irq(sr501_gpio);
 	request_irq(irq, sr501_isr, IRQF_TRIGGER_RISING|IRQF_TRIGGER_FALLING, "sr501", NULL);
-#else
+#else // 内核线程申请
 	sr501_kthread = kthread_create(sr501_thread, NULL, "sr501d");
 	wake_up_process(sr501_kthread);
 #endif
@@ -148,7 +132,6 @@ static int sr501_remove(struct platform_device *pdev)
 	printk("%s %s line %d\n", __FILE__, __FUNCTION__, __LINE__);
 	kthread_stop(sr501_kthread);
 	device_destroy(sr501_class, MKDEV(major, 0));
-	//free_irq(irq, NULL);
 	gpiod_put(sr501_gpio);
 	return 0;
 }

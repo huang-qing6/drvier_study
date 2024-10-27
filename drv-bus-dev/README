@@ -18,3 +18,12 @@ platform_device_id 中 id_table实现match，drv在id_talbe里注册能支持设
         --device_attach_driver // 链表遍历，从设备配对驱动
         --drive_match_device // 匹配函数
         --drive_probe
+
+## sr501 总结 ##
+？ 目前疑惑：
+为什么中断发生不了，直播课也是强行中断不是正常做到的
+
+主要多学习了一个内核线程
+kernel_thread(驱动不能用，其他地方可以), kthread_run, kethread_create三个函数
+概念和用户线程一样，1.创建内核线程 2.加函数 3.运行 4.销毁内核线程
+！！！假如引脚数据等待不能通过中断来获得，并且需要考虑cpu占用问题，就用内核线程是不错的选择
