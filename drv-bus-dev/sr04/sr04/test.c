@@ -10,13 +10,13 @@
 
 
 /*
- * ./sr04_test /dev/sr04
+ * ./sr501_test /dev/sr501
  *
  */
 int main(int argc, char **argv)
 {
 	int fd;
-	int us;
+	int val;
 
 	int i;
 	
@@ -37,20 +37,20 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-
 	while (1)
 	{
-		if (read(fd, &us, 4) == 4)
+		if (read(fd, &ns, 4) == 4)
 		{
-			printf("get distance: %d us\n", us);  /* mm */
-			printf("get distance: %d mm\n", us*340/2/1000);  /* mm */
+			printf("get distance: %d ns\n", ns);
+			printf("get distance: %d mm\n", ns*340/2/1000000);  /* mm */
 		}
 		else
 			printf("get distance: -1\n");
+		sleep(1);
 	}
-	
 	close(fd);
 	
 	return 0;
 }
+
 
